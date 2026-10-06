@@ -81,7 +81,7 @@ final class CreateOrderController
                     }
                 }
 
-                $order = $this->createAndDispatchOrder($input, $orderRepository, $messageBus);
+                $order = $this->createAndDispatchOrder($input, $orderRepository, $messageBus, $cache);
 
                 // Guardar en Redis el mapeo de idempotencia (TTL 24 horas)
                 $cachedItem->set($order->getId()->toRfc4122());
@@ -95,7 +95,7 @@ final class CreateOrderController
         }
 
         // 2. Procesamiento estándar sin cabecera de idempotencia
-        $order = $this->createAndDispatchOrder($input, $orderRepository, $messageBus);
+        $order = $this->createAndDispatchOrder($input, $orderRepository, $messageBus, $cache);
 
         return new JsonResponse($order->toArray(), Response::HTTP_ACCEPTED);
     }
@@ -104,6 +104,7 @@ final class CreateOrderController
         CreateOrderInput $input,
         OrderRepository $orderRepository,
         MessageBusInterface $messageBus,
+        CacheItemPoolInterface $cache,
     ): Order {
         $order = new Order();
         $order->setCustomerEmail($input->customerEmail);
@@ -111,6 +112,18 @@ final class CreateOrderController
         $order->setStatus(OrderStatus::PENDING);
 
         $orderRepository->save($order, flush: true);
+
+        // Precalentar estado en Redis para consultas inmediatas ultrarrápidas
+        $statusItem = $cache->getItem('order_status_' . $order->getId()->toRfc4122());
+        $statusItem->set([
+            'orderId' => $order->getId()->toRfc4122(),
+            'status' => OrderStatus::PENDING->value,
+            'customerEmail' => $order->getCustomerEmail(),
+            'totalAmount' => (float) $order->getTotalAmount(),
+            'updatedAt' => $order->getCreatedAt()->format(\DateTimeInterface::ATOM),
+        ]);
+        $statusItem->expiresAfter(3600);
+        $cache->save($statusItem);
 
         $messageBus->dispatch(
             new CreateOrderMessage(

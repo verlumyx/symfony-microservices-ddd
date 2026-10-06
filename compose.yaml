@@ -24,6 +24,33 @@ services:
       - redis
       - rabbitmq
 
+  worker:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      args:
+        UID: 1000
+        GID: 1000
+    container_name: symfony_worker
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+    environment:
+      APP_ENV: dev
+      APP_DEBUG: "1"
+      DATABASE_URL: "postgresql://app:app_secret@database:5432/app?serverVersion=16&charset=utf8"
+      MESSENGER_AMQP_DSN: "amqp://app:app_secret@rabbitmq:5672/%2f/messages"
+      MESSENGER_REDIS_DSN: "redis://redis:6379/messages"
+      REDIS_URL: "redis://redis:6379"
+      LOCK_DSN: "redis://redis:6379"
+    command: ["php", "bin/console", "messenger:consume", "async_orders", "async_fast", "-vv", "--time-limit=3600", "--memory-limit=128M"]
+    depends_on:
+      - database
+      - redis
+      - rabbitmq
+      - php
+
   web:
     image: nginx:1.27-alpine
     container_name: symfony_web

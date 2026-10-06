@@ -47,6 +47,18 @@ final readonly class CreateOrderHandler
         $order->setStatus(OrderStatus::PROCESSING);
         $this->orderRepository->save($order, flush: true);
 
+        // Reflejar estado PROCESSING en Redis
+        $processingItem = $this->cache->getItem('order_status_' . $message->orderId);
+        $processingItem->set([
+            'orderId' => $message->orderId,
+            'status' => OrderStatus::PROCESSING->value,
+            'customerEmail' => $message->customerEmail,
+            'totalAmount' => $message->totalAmount,
+            'updatedAt' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
+        ]);
+        $processingItem->expiresAfter(3600);
+        $this->cache->save($processingItem);
+
         // Simulamos latencia de procesamiento
         usleep(250000); // 250 ms
 

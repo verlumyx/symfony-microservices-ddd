@@ -22,7 +22,7 @@ help: ## Muestra este menú de ayuda
 	@echo -e ''
 
 ##@ 🐳 Gestión de Contenedores Docker
-.PHONY: up down start stop restart build ps logs logs-php clean
+.PHONY: up down start stop restart build ps logs logs-php logs-worker clean
 
 up: ## Inicia todos los contenedores en segundo plano
 	$(DC) up -d
@@ -50,6 +50,9 @@ logs: ## Muestra los logs en tiempo real de todos los servicios
 
 logs-php: ## Muestra los logs del contenedor PHP
 	$(DC) logs -f php
+
+logs-worker: ## Muestra los logs del contenedor Worker en segundo plano
+	$(DC) logs -f worker
 
 clean: ## Detiene contenedores y elimina volúmenes y redes huérfanas (⚠️ borra datos)
 	$(DC) down -v --remove-orphans
@@ -95,7 +98,7 @@ routes: ## Muestra las rutas registradas en la aplicación
 	$(DC) exec php php bin/console debug:router
 
 ##@ 📨 Symfony Messenger
-.PHONY: messenger-setup consume consume-fast messenger-failed messenger-retry
+.PHONY: messenger-setup consume consume-fast messenger-failed messenger-retry messenger-stop worker-restart
 
 messenger-setup: ## Inicializa colas, exchanges y transportes en RabbitMQ y Redis
 	$(DC) exec php php bin/console messenger:setup-transports
@@ -111,6 +114,12 @@ messenger-failed: ## Muestra los mensajes fallidos en la Dead Letter Queue
 
 messenger-retry: ## Reintenta los mensajes fallidos de la Dead Letter Queue
 	$(DC) exec php php bin/console messenger:failed:retry
+
+messenger-stop: ## Detiene gracefully los workers activos para que se reinicien
+	$(DC) exec php php bin/console messenger:stop-workers
+
+worker-restart: ## Reinicia el contenedor del worker en segundo plano
+	$(DC) restart worker
 
 ##@ 🗄️ Base de Datos y Doctrine
 .PHONY: db-create db-migrate db-diff db-check-vector

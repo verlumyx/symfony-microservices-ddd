@@ -166,6 +166,62 @@ class OrderOpenApiDecorator implements OpenApiFactoryInterface
                 ])
         ));
 
+        // 3. Documentar GET /api/orders/{id}/status (Ultra-rápido vía Redis)
+        $orderStatusSchema = [
+            'type' => 'object',
+            'properties' => [
+                'orderId' => ['type' => 'string', 'format' => 'uuid', 'example' => '91c8363d-d3be-4ff7-ad9d-eaf48b3199d8'],
+                'status' => ['type' => 'string', 'enum' => ['PENDING', 'PROCESSING', 'CONFIRMED', 'FAILED'], 'example' => 'CONFIRMED'],
+                'customerEmail' => ['type' => 'string', 'example' => 'cliente@example.com'],
+                'totalAmount' => ['type' => 'number', 'format' => 'float', 'example' => 125.75],
+                'updatedAt' => ['type' => 'string', 'format' => 'date-time'],
+            ],
+            'required' => ['orderId', 'status', 'customerEmail', 'totalAmount', 'updatedAt'],
+        ];
+
+        $openApi->getPaths()->addPath('/api/orders/{id}/status', (new PathItem())->withGet(
+            (new Operation())
+                ->withOperationId('orders_get_status')
+                ->withTags(['Orders'])
+                ->withSummary('Consulta ultrarrápida del estado de un pedido (Redis Cache)')
+                ->withDescription('Consulta el estado de la orden en Redis con latencia de sub-milisegundo. Si no está en caché (MISS), consulta la base de datos PostgreSQL y repuebla Redis de forma transparente. Devuelve la cabecera X-Cache (HIT/MISS).')
+                ->withSecurity([['JWT' => []]])
+                ->withParameters([
+                    new Parameter(
+                        name: 'id',
+                        in: 'path',
+                        description: 'UUID del pedido',
+                        required: true,
+                        schema: ['type' => 'string', 'format' => 'uuid']
+                    ),
+                ])
+                ->withResponses([
+                    '200' => [
+                        'description' => 'Estado del pedido obtenido exitosamente (con cabecera X-Cache: HIT o MISS)',
+                        'headers' => [
+                            'X-Cache' => [
+                                'description' => 'Indica si la respuesta provino de Redis (HIT) o de la base de datos (MISS)',
+                                'schema' => ['type' => 'string', 'enum' => ['HIT', 'MISS']],
+                            ],
+                        ],
+                        'content' => [
+                            'application/json' => [
+                                'schema' => $orderStatusSchema,
+                            ],
+                        ],
+                    ],
+                    '400' => [
+                        'description' => 'UUID con formato inválido',
+                    ],
+                    '401' => [
+                        'description' => 'Token JWT ausente o inválido',
+                    ],
+                    '404' => [
+                        'description' => 'Pedido no encontrado',
+                    ],
+                ])
+        ));
+
         return $openApi;
     }
 }
