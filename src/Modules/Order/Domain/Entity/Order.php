@@ -4,54 +4,34 @@ declare(strict_types=1);
 
 namespace App\Modules\Order\Domain\Entity;
 
-use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Get;
-use ApiPlatform\Metadata\GetCollection;
-use ApiPlatform\Metadata\Post;
 use App\Modules\Order\Domain\Enum\OrderStatus;
 use App\Modules\Order\Infrastructure\Repository\OrderRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Uid\Uuid;
 
 #[ORM\Entity(repositoryClass: OrderRepository::class)]
 #[ORM\Table(name: 'orders')]
 #[ORM\HasLifecycleCallbacks]
-#[ApiResource(
-    operations: [
-        new GetCollection(),
-        new Get(),
-        new Post(),
-    ],
-    normalizationContext: ['groups' => ['order:read']],
-    denormalizationContext: ['groups' => ['order:write']],
-)]
 class Order
 {
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
-    #[Groups(['order:read'])]
     private ?Uuid $id = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['order:read', 'order:write'])]
     private ?string $customerEmail = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2)]
-    #[Groups(['order:read', 'order:write'])]
     private ?string $totalAmount = null;
 
     #[ORM\Column(length: 20, enumType: OrderStatus::class)]
-    #[Groups(['order:read'])]
     private OrderStatus $status = OrderStatus::PENDING;
 
     #[ORM\Column]
-    #[Groups(['order:read'])]
     private \DateTimeImmutable $createdAt;
 
     #[ORM\Column(nullable: true)]
-    #[Groups(['order:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
 
     public function __construct(?Uuid $id = null)
@@ -117,5 +97,17 @@ class Order
     public function onPreUpdate(): void
     {
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function toArray(): array
+    {
+        return [
+            'id' => $this->id?->toRfc4122(),
+            'customerEmail' => $this->customerEmail,
+            'totalAmount' => $this->getTotalAmount(),
+            'status' => $this->status->value,
+            'createdAt' => $this->createdAt->format(\DateTimeInterface::ATOM),
+            'updatedAt' => $this->updatedAt?->format(\DateTimeInterface::ATOM),
+        ];
     }
 }

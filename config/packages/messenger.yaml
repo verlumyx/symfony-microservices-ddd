@@ -11,9 +11,10 @@ framework:
                     exchange:
                         name: orders_exchange
                         type: topic
+                        default_publish_routing_key: 'order.created'
                     queues:
                         order_processing:
-                            binding_keys: ['order.created']
+                            binding_keys: ['order.created', 'order.#']
                 retry_strategy:
                     max_retries: 3
                     delay: 1000
