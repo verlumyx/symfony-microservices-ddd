@@ -55,7 +55,11 @@ clean: ## Detiene contenedores y elimina volúmenes y redes huérfanas (⚠️ b
 	$(DC) down -v --remove-orphans
 
 ##@ 🐚 Terminal y Acceso a Contenedores
-.PHONY: sh sh-root sh-db sh-redis
+.PHONY: sh sh-root sh-db sh-redis perms
+
+perms: ## Corrige los permisos de todos los archivos para el usuario anfitrión (UID 1000)
+	$(DC) exec -u root php chown -R 1000:1000 /var/www/html
+	$(DC) exec -u root php chmod -R u+rwX /var/www/html
 
 sh: ## Abre una terminal interactiva (sh/bash) dentro del contenedor PHP
 	$(DC) exec php bash || $(DC) exec php sh
