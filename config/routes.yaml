@@ -12,3 +12,7 @@ controllers:
         path: ../src/
         namespace: App
     type: attribute
+
+api_auth_login:
+    path: /api/auth/login
+    methods: [POST]
