@@ -60,6 +60,17 @@ services:
     volumes:
       - redis_data:/data
 
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: symfony_redis_commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
     container_name: symfony_rabbitmq
