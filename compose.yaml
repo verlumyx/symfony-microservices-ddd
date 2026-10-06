@@ -18,6 +18,7 @@ services:
       MESSENGER_AMQP_DSN: "amqp://app:app_secret@rabbitmq:5672/%2f/messages"
       MESSENGER_REDIS_DSN: "redis://redis:6379/messages"
       REDIS_URL: "redis://redis:6379"
+      LOCK_DSN: "redis://redis:6379"
     depends_on:
       - database
       - redis

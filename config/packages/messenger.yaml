@@ -1,0 +1,43 @@
+framework:
+    messenger:
+        failure_transport: failed
+
+        transports:
+            # RabbitMQ AMQP Transport
+            async_orders:
+                dsn: '%env(MESSENGER_AMQP_DSN)%'
+                options:
+                    auto_setup: true
+                    exchange:
+                        name: orders_exchange
+                        type: topic
+                    queues:
+                        order_processing:
+                            binding_keys: ['order.created']
+                retry_strategy:
+                    max_retries: 3
+                    delay: 1000
+                    multiplier: 2
+
+            # Redis Transport (para tareas ultrarrápidas o de prioridad alta)
+            async_fast:
+                dsn: '%env(MESSENGER_REDIS_DSN)%'
+                options:
+                    auto_setup: true
+
+            # Dead Letter Queue (Doctrine)
+            failed: 'doctrine://default?queue_name=failed'
+
+            # Síncrono
+            sync: 'sync://'
+
+        routing:
+            'App\Modules\Order\Application\Message\CreateOrderMessage': async_orders
+            'App\Modules\Order\Application\Message\SendNotificationMessage': async_orders
+
+when@test:
+    framework:
+        messenger:
+            transports:
+                async_orders: 'in-memory://'
+                async_fast: 'in-memory://'

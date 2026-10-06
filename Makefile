@@ -83,7 +83,7 @@ composer-update: ## Ejecuta composer update dentro del contenedor
 	$(DC) exec php composer update
 
 ##@ ⚡ Symfony Console
-.PHONY: sf cc routes consume
+.PHONY: sf cc routes
 
 sf: ## Ejecuta comandos de bin/console (ej: make sf cmd="cache:clear")
 	$(DC) exec php php bin/console $(cmd)
@@ -94,8 +94,23 @@ cc: ## Limpia la cache de Symfony
 routes: ## Muestra las rutas registradas en la aplicación
 	$(DC) exec php php bin/console debug:router
 
-consume: ## Inicia el consumidor de Symfony Messenger (worker en tiempo real)
+##@ 📨 Symfony Messenger
+.PHONY: messenger-setup consume consume-fast messenger-failed messenger-retry
+
+messenger-setup: ## Inicializa colas, exchanges y transportes en RabbitMQ y Redis
+	$(DC) exec php php bin/console messenger:setup-transports
+
+consume: ## Inicia el consumidor de pedidos (worker RabbitMQ en tiempo real)
 	$(DC) exec php php bin/console messenger:consume async_orders -vv
+
+consume-fast: ## Inicia el consumidor rápido (worker Redis en tiempo real)
+	$(DC) exec php php bin/console messenger:consume async_fast -vv
+
+messenger-failed: ## Muestra los mensajes fallidos en la Dead Letter Queue
+	$(DC) exec php php bin/console messenger:failed:show
+
+messenger-retry: ## Reintenta los mensajes fallidos de la Dead Letter Queue
+	$(DC) exec php php bin/console messenger:failed:retry
 
 ##@ 🗄️ Base de Datos y Doctrine
 .PHONY: db-create db-migrate db-diff db-check-vector
