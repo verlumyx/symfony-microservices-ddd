@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagrama de Arquitectura - Symfony 7.4 Microservicios</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 30px;
+      background-color: #0f172a;
+      color: #f8fafc;
+    }
+    h1 {
+      text-align: center;
+      color: #38bdf8;
+      margin-bottom: 8px;
+    }
+    p.subtitle {
+      text-align: center;
+      color: #94a3b8;
+      margin-top: 0;
+      margin-bottom: 30px;
+    }
+    .card {
+      background-color: #1e293b;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      border: 1px solid #334155;
+    }
+    h2 {
+      color: #a5b4fc;
+      margin-top: 0;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 10px;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Arquitectura Hexagonal & Flujos Asíncronos</h1>
+  <p class="subtitle">Stack: PHP 8.3 FPM • Nginx • PostgreSQL 16 (pgvector) • RabbitMQ 3.13 • Redis 7</p>
+
+  <div class="card">
+    <h2>1. Arquitectura en Capas (DDD) y Servicios Docker</h2>
+    <div class="mermaid">
+flowchart TD
+    subgraph CLIENTES["🌐 Clientes Externos"]
+        HTTP["Frontend / Swagger UI / Mobile"]
+    end
+
+    subgraph DOCKER["🐳 Entorno Docker"]
+        
+        subgraph WEB_SVC["Servicio Web (Nginx :8080)"]
+            NGINX["Nginx Reverse Proxy"]
+        end
+
+        subgraph PHP_SVC["Servicio API (PHP-FPM :9000)"]
+            subgraph INFRA_HTTP["🔴 Infraestructura (HTTP Adapters)"]
+                C_AUTH["AuthController: /register, /login, /me"]
+                C_ORDER_POST["CreateOrderController: POST /orders"]
+                C_ORDER_STATUS["GetOrderStatusController: GET /status"]
+                C_ORDER_GET["GetOrderController / ListOrdersController"]
+            end
+
+            subgraph APP_LAYER["🟡 Aplicación (Casos de Uso & Puertos)"]
+                UC_AUTH["RegisterUserUseCase / GetProfileUseCase"]
+                UC_CREATE["CreateOrderUseCase"]
+                UC_STATUS["GetOrderStatusUseCase"]
+                UC_GET["GetOrderUseCase / ListOrdersUseCase"]
+                PORTS["Puertos (Interfaces):\n• OrderStatusCacheInterface\n• IdempotencyManagerInterface\n• OrderEventPublisherInterface\n• OrderRepositoryInterface"]
+            end
+
+            subgraph DOMAIN_LAYER["🟢 Dominio (Lógica Pura de Negocio)"]
+                ENT_ORDER["Order Entity (create, markAsProcessing, markAsConfirmed)"]
+                ENT_USER["User Entity (create)"]
+                ENUMS["OrderStatus Enum"]
+                EXCEPTIONS["Domain Exceptions"]
+            end
+
+            subgraph INFRA_ADAPTERS["🔴 Infraestructura (Adaptadores Concretos)"]
+                ADAPT_CACHE["RedisOrderStatusCache"]
+                ADAPT_IDEM["RedisIdempotencyManager"]
+                ADAPT_BUS["MessengerOrderEventPublisher"]
+                REPO_DOCTRINE["OrderRepository / UserRepository"]
+            end
+        end
+
+        subgraph WORKER_SVC["Servicio Worker (symfony_worker)"]
+            CONSUMER["messenger:consume async_orders"]
+            H_CREATE["CreateOrderHandler"]
+            H_NOTIF["SendNotificationHandler"]
+        end
+
+        subgraph STORAGE["🗄️ Infraestructura de Datos & Mensajería"]
+            REDIS[("Redis 7\n• Idempotencia & Locks\n• Caché de Estados")]
+            RABBIT[("RabbitMQ 3.13\n• Exchange: orders_exchange\n• Cola: order_processing")]
+            POSTGRES[("PostgreSQL 16 + pgvector\n• Tablas: orders, users")]
+        end
+    end
+
+    HTTP -->|Petición HTTP| NGINX
+    NGINX -->|FastCGI| PHP_SVC
+
+    C_AUTH --> UC_AUTH
+    C_ORDER_POST --> UC_CREATE
+    C_ORDER_STATUS --> UC_STATUS
+    C_ORDER_GET --> UC_GET
+
+    UC_CREATE --> ENT_ORDER
+    UC_CREATE --> PORTS
+    UC_STATUS --> PORTS
+    PORTS -.-> ADAPT_CACHE
+    PORTS -.-> ADAPT_IDEM
+    PORTS -.-> ADAPT_BUS
+    PORTS -.-> REPO_DOCTRINE
+
+    ADAPT_IDEM --> REDIS
+    ADAPT_CACHE --> REDIS
+    ADAPT_BUS --> RABBIT
+    REPO_DOCTRINE --> POSTGRES
+
+    RABBIT --> CONSUMER
+    CONSUMER --> H_CREATE
+    CONSUMER --> H_NOTIF
+    H_CREATE --> POSTGRES
+    H_CREATE --> REDIS
+    H_CREATE --> RABBIT
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. Flujo de Secuencia Asíncrono de un Pedido</h2>
+    <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor Cliente as 🌐 Cliente
+    participant API as ⚡ API (PHP-FPM)
+    participant Redis as 🔴 Redis
+    participant Postgres as 🐘 PostgreSQL
+    participant Rabbit as 🐰 RabbitMQ
+    participant Worker as ⚙️ Worker
+
+    Cliente->>API: 1. POST /api/orders (X-Idempotency-Key)
+    API->>Redis: 2. Lock & Check Idempotencia
+    API->>Postgres: 3. Guarda orden (PENDING)
+    API->>Redis: 4. Precalienta estado PENDING
+    API->>Rabbit: 5. Publica CreateOrderMessage
+    API-->>Cliente: 6. 202 Accepted (<15ms)
+
+    Note over Rabbit,Worker: Procesamiento en Segundo Plano
+    Rabbit->>Worker: 7. Entrega CreateOrderMessage
+    Worker->>Postgres: 8. Cambia estado a PROCESSING
+    Worker->>Redis: 9. Actualiza caché a PROCESSING
+    Note over Worker: Simulación de pago y stock (250ms)
+    Worker->>Postgres: 10. Cambia estado a CONFIRMED
+    Worker->>Redis: 11. Actualiza caché a CONFIRMED
+    Worker->>Rabbit: 12. Publica SendNotificationMessage
+    Rabbit->>Worker: 13. Consume SendNotificationMessage
+    Note over Worker: Envía notificación/email al cliente
+    Worker->>Rabbit: 14. ACK (Mensajes finalizados)
+
+    Note over Cliente,Redis: Consulta Instantánea
+    Cliente->>API: 15. GET /api/orders/{id}/status
+    API->>Redis: 16. Consulta rápida
+    Redis-->>API: Estado CONFIRMED (Hit)
+    API-->>Cliente: 17. 200 OK con X-Cache: HIT (<1ms)
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        darkMode: true,
+        background: '#1e293b',
+        primaryColor: '#38bdf8',
+        primaryTextColor: '#f8fafc',
+        primaryBorderColor: '#0284c7',
+        lineColor: '#94a3b8',
+        secondaryColor: '#818cf8',
+        tertiaryColor: '#334155'
+      }
+    });
+  </script>
+</body>
+</html>

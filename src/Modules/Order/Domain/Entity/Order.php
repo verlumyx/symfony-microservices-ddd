@@ -41,6 +41,34 @@ class Order
         $this->createdAt = new \DateTimeImmutable();
     }
 
+    public static function create(string $customerEmail, float $totalAmount, ?Uuid $id = null): self
+    {
+        $order = new self($id);
+        $order->setCustomerEmail($customerEmail);
+        $order->setTotalAmount($totalAmount);
+        $order->status = OrderStatus::PENDING;
+
+        return $order;
+    }
+
+    public function markAsProcessing(): void
+    {
+        $this->status = OrderStatus::PROCESSING;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function markAsConfirmed(): void
+    {
+        $this->status = OrderStatus::CONFIRMED;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function markAsFailed(): void
+    {
+        $this->status = OrderStatus::FAILED;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function getId(): ?Uuid
     {
         return $this->id;

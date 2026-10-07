@@ -4,27 +4,26 @@ declare(strict_types=1);
 
 namespace App\Modules\Order\Infrastructure\Controller;
 
-use App\Modules\Order\Infrastructure\Repository\OrderRepository;
+use App\Modules\Order\Application\UseCase\GetOrderUseCase;
+use App\Modules\Order\Domain\Exception\InvalidOrderException;
+use App\Modules\Order\Domain\Exception\OrderNotFoundException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Uid\Uuid;
 
 final class GetOrderController
 {
     #[Route('/api/orders/{id}', name: 'api_orders_get', methods: ['GET'])]
-    public function __invoke(string $id, OrderRepository $orderRepository): JsonResponse
+    public function __invoke(string $id, GetOrderUseCase $useCase): JsonResponse
     {
-        if (!Uuid::isValid($id)) {
-            return new JsonResponse(['error' => 'Identificador UUID inválido.'], Response::HTTP_BAD_REQUEST);
+        try {
+            $orderDto = $useCase->execute($id);
+
+            return new JsonResponse($orderDto->toArray(), Response::HTTP_OK);
+        } catch (InvalidOrderException $e) {
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        } catch (OrderNotFoundException $e) {
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_NOT_FOUND);
         }
-
-        $order = $orderRepository->find(Uuid::fromString($id));
-
-        if (!$order) {
-            return new JsonResponse(['error' => 'Pedido no encontrado.'], Response::HTTP_NOT_FOUND);
-        }
-
-        return new JsonResponse($order->toArray(), Response::HTTP_OK);
     }
 }
