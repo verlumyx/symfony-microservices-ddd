@@ -102,7 +102,8 @@ jwt-keys: ## Genera el par de claves pública/privada para autenticación JWT
 
 
 ##@ 📨 Symfony Messenger
-.PHONY: messenger-setup consume consume-fast messenger-failed messenger-retry messenger-stop worker-restart
+.PHONY: messenger-setup consume consume-fast messenger-failed messenger-failed-show messenger-retry messenger-reject messenger-failed-retry messenger-failed-reject messenger-stop worker-restart test-dlq order-recover
+
 
 messenger-setup: ## Inicializa colas, exchanges y transportes en RabbitMQ y Redis
 	$(DC) exec php php bin/console messenger:setup-transports
@@ -113,17 +114,33 @@ consume: ## Inicia el consumidor de pedidos (worker RabbitMQ en tiempo real)
 consume-fast: ## Inicia el consumidor rápido (worker Redis en tiempo real)
 	$(DC) exec php php bin/console messenger:consume async_fast -vv
 
-messenger-failed: ## Muestra los mensajes fallidos en la Dead Letter Queue
+messenger-failed: ## Muestra la lista de mensajes fallidos en la Dead Letter Queue
 	$(DC) exec php php bin/console messenger:failed:show
 
-messenger-retry: ## Reintenta los mensajes fallidos de la Dead Letter Queue
-	$(DC) exec php php bin/console messenger:failed:retry
+messenger-failed-show: ## Muestra motivo exacto y StackTrace del fallo (ej: make messenger-failed-show id=1)
+	$(DC) exec php php bin/console messenger:failed:show $(id) -vv
+
+messenger-retry: ## Reintenta mensajes fallidos de la DLQ (ej: make messenger-retry [id=1])
+	$(DC) exec php php bin/console messenger:failed:retry $(id)
+
+messenger-reject: ## Descarta/borra un mensaje fallido de la DLQ (ej: make messenger-reject id=1)
+	$(DC) exec php php bin/console messenger:failed:reject $(id)
+
+messenger-failed-retry: messenger-retry ## Alias de messenger-retry
+messenger-failed-reject: messenger-reject ## Alias de messenger-reject
 
 messenger-stop: ## Detiene gracefully los workers activos para que se reinicien
 	$(DC) exec php php bin/console messenger:stop-workers
 
 worker-restart: ## Reinicia el contenedor del worker en segundo plano
 	$(DC) restart worker
+
+test-dlq: ## Ejecuta la prueba automatizada de tolerancia a fallos, reintentos y Dead Letter Queue
+	$(DC) exec php php bin/console app:order:test-fault-tolerance
+
+order-recover: ## Establece flag de recuperación para un pedido (ej: make order-recover id="UUID")
+	$(DC) exec php php bin/console app:order:recover $(id)
+
 
 ##@ 🗄️ Base de Datos y Doctrine
 .PHONY: db-create db-migrate db-diff db-check-vector

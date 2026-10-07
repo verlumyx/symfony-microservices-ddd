@@ -11,6 +11,7 @@ use Psr\Cache\CacheItemPoolInterface;
 final readonly class RedisOrderStatusCache implements OrderStatusCacheInterface
 {
     private const KEY_PREFIX = 'order_status_';
+    private const RECOVERY_PREFIX = 'order_recovery_';
 
     public function __construct(
         private CacheItemPoolInterface $cache,
@@ -37,6 +38,22 @@ final readonly class RedisOrderStatusCache implements OrderStatusCacheInterface
     {
         $item = $this->cache->getItem(self::KEY_PREFIX . $dto->orderId);
         $item->set($dto->toArray());
+        $item->expiresAfter($ttl);
+
+        $this->cache->save($item);
+    }
+
+    public function hasRecoveryFlag(string $orderId): bool
+    {
+        $item = $this->cache->getItem(self::RECOVERY_PREFIX . $orderId);
+
+        return $item->isHit();
+    }
+
+    public function setRecoveryFlag(string $orderId, int $ttl = 3600): void
+    {
+        $item = $this->cache->getItem(self::RECOVERY_PREFIX . $orderId);
+        $item->set(true);
         $item->expiresAfter($ttl);
 
         $this->cache->save($item);

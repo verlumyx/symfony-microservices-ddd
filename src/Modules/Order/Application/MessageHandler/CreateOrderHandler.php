@@ -47,7 +47,26 @@ final readonly class CreateOrderHandler
         // Simulamos latencia de procesamiento
         usleep(250000); // 250 ms
 
-        // 2. Transición de dominio a CONFIRMED y actualización de caché
+        // 2. Simulación de fallo en pasarela externa para pruebas de tolerancia a fallos y DLQ
+        if (str_contains(strtolower($message->customerEmail), 'fail') || str_contains(strtolower($message->customerEmail), 'dlq')) {
+            if ($this->statusCache->hasRecoveryFlag($message->orderId)) {
+                $this->logger->info('Pasarela de pagos recuperada tras reintento para la orden', [
+                    'orderId' => $message->orderId,
+                ]);
+            } else {
+                $this->logger->error('Fallo simulado en pasarela de pagos al procesar orden', [
+                    'orderId' => $message->orderId,
+                    'customerEmail' => $message->customerEmail,
+                ]);
+
+                throw \App\Modules\Order\Domain\Exception\PaymentFailedException::forOrder(
+                    orderId: $message->orderId,
+                    customerEmail: $message->customerEmail,
+                );
+            }
+        }
+
+        // 3. Transición de dominio a CONFIRMED y actualización de caché
         $order->markAsConfirmed();
         $this->orderRepository->save($order, flush: true);
         $this->statusCache->save(OrderStatusDto::fromEntity($order));

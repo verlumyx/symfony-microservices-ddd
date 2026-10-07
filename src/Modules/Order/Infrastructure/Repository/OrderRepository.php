@@ -34,6 +34,11 @@ class OrderRepository extends ServiceEntityRepository implements OrderRepository
         return $this->find($id);
     }
 
+    public function refresh(Order $order): void
+    {
+        $this->getEntityManager()->refresh($order);
+    }
+
     /**
      * @return Order[]
      */

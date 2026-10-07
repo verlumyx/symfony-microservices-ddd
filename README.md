@@ -159,6 +159,12 @@ Deberías ver 7 contenedores activos: `symfony_php`, `symfony_web`, `symfony_dat
 - **Cache HIT:** Consulta Redis directamente y responde en **$< 1$ ms** con la cabecera `X-Cache: HIT`.
 - **Cache MISS:** Si la llave expiró en Redis, consulta PostgreSQL, repuebla automáticamente Redis para futuras consultas y responde con `X-Cache: MISS`.
 
+### 5. Tolerancia a Fallos y Dead Letter Queue (DLQ)
+- **Estrategia de Reintentos:** Ante excepciones en el procesamiento (ej: fallos de pasarela externa), Symfony Messenger aplica una estrategia de reintentos exponencial con 3 intentos máximos (`delay: 1000ms`, `multiplier: 2` $\to$ reintentos a los 1s, 2s y 4s).
+- **Desvío a la DLQ:** Si el mensaje agota los 3 reintentos, es descartado de RabbitMQ y enviado a la Dead Letter Queue en PostgreSQL (`doctrine://default?queue_name=failed`).
+- **Sincronización de Estado FAILED:** El suscriptor `OrderFailedEventSubscriber` captura el evento final, marca el pedido en PostgreSQL como `FAILED` y actualiza Redis a `FAILED` en tiempo real.
+- **Inspección y Recuperación:** Los mensajes fallidos se inspeccionan con `make messenger-failed` y pueden reintentarse manualmente con `make messenger-retry`. Puedes probar todo el ciclo con `make test-dlq`.
+
 ---
 
 ## 📡 Endpoints de la API
@@ -221,11 +227,13 @@ make sf cmd="ruta"    # Ejecuta comandos de Symfony (ej: make sf cmd="debug:rout
 make cc               # Limpia la caché de Symfony
 make routes           # Lista todas las rutas registradas
 
-# Mensajería & Workers
+# Mensajería, Workers & Tolerancia a Fallos
 make messenger-setup  # Inicializa colas y exchanges en RabbitMQ
 make messenger-stop   # Detiene y reinicia gracefully los workers para recargar código
 make messenger-failed # Muestra mensajes en la Dead Letter Queue (DLQ)
-make messenger-retry  # Reintenta procesar mensajes fallidos
+make messenger-retry  # Reintenta procesar mensajes fallidos desde la DLQ
+make test-dlq         # Ejecuta la prueba automatizada completa de tolerancia a fallos y DLQ
+make order-recover id="UUID" # Establece flag de recuperación para un pedido fallido
 
 # Base de Datos
 make db-migrate       # Ejecuta migraciones pendientes de Doctrine

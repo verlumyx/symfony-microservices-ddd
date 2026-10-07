@@ -13,6 +13,8 @@ interface OrderRepositoryInterface
 
     public function findById(Uuid $id): ?Order;
 
+    public function refresh(Order $order): void;
+
     /**
      * @return Order[]
      */

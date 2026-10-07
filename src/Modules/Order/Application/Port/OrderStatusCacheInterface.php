@@ -11,4 +11,8 @@ interface OrderStatusCacheInterface
     public function get(string $orderId): ?OrderStatusDto;
 
     public function save(OrderStatusDto $dto, int $ttl = 3600): void;
+
+    public function hasRecoveryFlag(string $orderId): bool;
+
+    public function setRecoveryFlag(string $orderId, int $ttl = 3600): void;
 }
