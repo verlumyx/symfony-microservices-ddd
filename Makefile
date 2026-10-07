@@ -86,7 +86,7 @@ composer-update: ## Ejecuta composer update dentro del contenedor
 	$(DC) exec php composer update
 
 ##@ ⚡ Symfony Console
-.PHONY: sf cc routes
+.PHONY: sf cc routes jwt-keys
 
 sf: ## Ejecuta comandos de bin/console (ej: make sf cmd="cache:clear")
 	$(DC) exec php php bin/console $(cmd)
@@ -96,6 +96,10 @@ cc: ## Limpia la cache de Symfony
 
 routes: ## Muestra las rutas registradas en la aplicación
 	$(DC) exec php php bin/console debug:router
+
+jwt-keys: ## Genera el par de claves pública/privada para autenticación JWT
+	$(DC) exec php php bin/console lexik:jwt:generate-keypair --skip-if-exists
+
 
 ##@ 📨 Symfony Messenger
 .PHONY: messenger-setup consume consume-fast messenger-failed messenger-retry messenger-stop worker-restart
