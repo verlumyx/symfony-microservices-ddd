@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Order\Infrastructure\Messaging;
 
 use App\Modules\Order\Application\Message\CreateOrderMessage;
+use App\Modules\Order\Application\Message\OrderCancelledMessage;
 use App\Modules\Order\Application\Message\SendNotificationMessage;
 use App\Modules\Order\Application\Port\OrderEventPublisherInterface;
 use Symfony\Component\Messenger\Bridge\Amqp\Transport\AmqpStamp;
@@ -38,6 +39,18 @@ final readonly class MessengerOrderEventPublisher implements OrderEventPublisher
                 message: $message,
             ),
             [new AmqpStamp('order.notification')]
+        );
+    }
+
+    public function publishOrderCancelled(string $orderId, string $customerEmail, ?string $reason = null): void
+    {
+        $this->messageBus->dispatch(
+            new OrderCancelledMessage(
+                orderId: $orderId,
+                customerEmail: $customerEmail,
+                reason: $reason,
+            ),
+            [new AmqpStamp('order.cancelled')]
         );
     }
 }

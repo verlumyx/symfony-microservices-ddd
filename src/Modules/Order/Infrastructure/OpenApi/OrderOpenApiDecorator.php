@@ -32,7 +32,7 @@ class OrderOpenApiDecorator implements OpenApiFactoryInterface
                 'id' => ['type' => 'string', 'format' => 'uuid', 'example' => '91c8363d-d3be-4ff7-ad9d-eaf48b3199d8'],
                 'customerEmail' => ['type' => 'string', 'example' => 'cliente@example.com'],
                 'totalAmount' => ['type' => 'number', 'format' => 'float', 'example' => 125.75],
-                'status' => ['type' => 'string', 'enum' => ['PENDING', 'PROCESSING', 'CONFIRMED', 'FAILED'], 'example' => 'PENDING'],
+                'status' => ['type' => 'string', 'enum' => ['PENDING', 'PROCESSING', 'CONFIRMED', 'FAILED', 'CANCELLED'], 'example' => 'PENDING'],
                 'createdAt' => ['type' => 'string', 'format' => 'date-time'],
                 'updatedAt' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
             ],
@@ -212,6 +212,60 @@ class OrderOpenApiDecorator implements OpenApiFactoryInterface
                     ],
                     '400' => [
                         'description' => 'UUID con formato inválido',
+                    ],
+                    '401' => [
+                        'description' => 'Token JWT ausente o inválido',
+                    ],
+                    '404' => [
+                        'description' => 'Pedido no encontrado',
+                    ],
+                ])
+        ));
+
+        // 4. Documentar POST /api/orders/{id}/cancel
+        $openApi->getPaths()->addPath('/api/orders/{id}/cancel', (new PathItem())->withPost(
+            (new Operation())
+                ->withOperationId('orders_cancel')
+                ->withTags(['Orders'])
+                ->withSummary('Cancela un pedido y genera evento asíncrono')
+                ->withDescription('Actualiza el estado de la orden a CANCELLED y publica un OrderCancelledMessage en RabbitMQ para ejecutar compensaciones (reembolsos, liberación de stock).')
+                ->withSecurity([['JWT' => []]])
+                ->withParameters([
+                    new Parameter(
+                        name: 'id',
+                        in: 'path',
+                        description: 'UUID del pedido a cancelar',
+                        required: true,
+                        schema: ['type' => 'string', 'format' => 'uuid']
+                    ),
+                ])
+                ->withRequestBody(
+                    (new RequestBody())
+                        ->withDescription('Motivo opcional de cancelación')
+                        ->withRequired(false)
+                        ->withContent(new \ArrayObject([
+                            'application/json' => new MediaType(new \ArrayObject([
+                                'type' => 'object',
+                                'properties' => [
+                                    'reason' => [
+                                        'type' => 'string',
+                                        'example' => 'El cliente solicitó reembolso por duplicidad',
+                                    ],
+                                ],
+                            ]))
+                        ]))
+                )
+                ->withResponses([
+                    '200' => [
+                        'description' => 'Pedido cancelado con éxito y evento publicado',
+                        'content' => [
+                            'application/json' => [
+                                'schema' => $orderSchema,
+                            ],
+                        ],
+                    ],
+                    '400' => [
+                        'description' => 'UUID inválido o la orden ya estaba cancelada',
                     ],
                     '401' => [
                         'description' => 'Token JWT ausente o inválido',

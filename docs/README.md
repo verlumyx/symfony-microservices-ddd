@@ -12,6 +12,12 @@ Bienvenido a la documentación técnica del proyecto. Este repositorio implement
    - Responsabilidades de cada componente (**API Platform**, **Symfony Messenger**, **RabbitMQ**, **Redis**, **PostgreSQL**).
 2. [Hoja de Ruta de Implementación](file:///home/verlumyx/Documentos/dev/symfony-practica/docs/roadmap.md)
    - Fases paso a paso para levantar el entorno Docker, inicializar el proyecto y configurar los servicios.
+3. [RabbitMQ y Conceptos Clave para Entrevistas](file:///home/verlumyx/Documentos/dev/symfony-practica/docs/rabbitmq_conceptos_entrevista.md)
+   - Glosario de términos técnicos (Broker, Exchange, Queue, Binding, Routing Key).
+   - Tipos de Exchange y cuándo usarlos (Direct, Fanout, Topic, Headers).
+   - Patrones de resiliencia: DLQ, Idempotencia, Prefetch Count (QoS), Poison Pill y Reintentos.
+   - Comparativa arquitectónica: RabbitMQ vs Apache Kafka vs Redis.
+   - Preguntas trampa y respuestas recomendadas para entrevistas técnicas.
 
 ---
 

@@ -69,6 +69,17 @@ class Order
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    public function markAsCancelled(): void
+    {
+        $this->status = OrderStatus::CANCELLED;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function canBeCancelled(): bool
+    {
+        return $this->status !== OrderStatus::CANCELLED;
+    }
+
     public function getId(): ?Uuid
     {
         return $this->id;

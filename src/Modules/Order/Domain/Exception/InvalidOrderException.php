@@ -22,4 +22,9 @@ final class InvalidOrderException extends InvalidArgumentException
     {
         return new self(sprintf('El identificador UUID "%s" no tiene un formato válido.', $uuid));
     }
+
+    public static function alreadyCancelled(string $uuid): self
+    {
+        return new self(sprintf('La orden con ID "%s" ya se encuentra cancelada.', $uuid));
+    }
 }

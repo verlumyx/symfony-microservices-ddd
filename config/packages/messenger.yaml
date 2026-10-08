@@ -33,8 +33,14 @@ framework:
             sync: 'sync://'
 
         routing:
+            # RabbitMQ (Topic Exchange: orders_exchange)
             'App\Modules\Order\Application\Message\CreateOrderMessage': async_orders
             'App\Modules\Order\Application\Message\SendNotificationMessage': async_orders
+            'App\Modules\Order\Application\Message\OrderCancelledMessage': async_orders
+
+            # Redis Transport (Streams en memoria)
+            'App\Modules\Auth\Application\Message\UserRegisteredMessage': async_fast
+            'App\Modules\Auth\Application\Message\UserLoggedInMessage': async_fast
 
 when@test:
     framework:

@@ -9,4 +9,7 @@ interface OrderEventPublisherInterface
     public function publishOrderCreated(string $orderId, string $customerEmail, float $totalAmount): void;
 
     public function publishNotification(string $orderId, string $recipientEmail, string $message): void;
+
+    public function publishOrderCancelled(string $orderId, string $customerEmail, ?string $reason = null): void;
 }
+
